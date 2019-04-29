@@ -1,0 +1,44 @@
+# 版本需要根据具体的 docker 版本进行选择，不同版本的 yml 语法要求会有差异
+version: "3.7"
+
+# 各个容器要放到服务下面  
+services:
+
+  mysql-server:
+    image: mysql/mysql-server:5.7
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=yourpassword
+      # 可以在这里直接新建 db
+      - MYSQL_DATABASE=initdb
+      # 声明时区，否则默认为零时区
+      - TZ=Asia/Shanghai
+    volumes: 
+      # mysql docker 的数据位于 container 内的 /var/lib/mysql
+      - /var/lib/docker/volumes/mysql_data:/var/lib/mysql
+      # 不同版本的 mysql 设定文件未必相同，参考 docker hub 中的官方文档，这里是 /etc/my.cnf
+      - /root/server_docker/mysql_env/conf/my.cnf:/etc/my.cnf
+      # 位于 /docker-entrypoint-initdb.d/ 路径下的 sql 文件会在容器启动后马上执行（实际不限于.sql 后缀，还有其他几项）
+      - /root/server_docker/mysql_env/init:/docker-entrypoint-initdb.d/
+    ports:
+      - "3306:3306"
+    container_name: mysql-server
+
+  anaconda3:
+    # 还可以通过 dockerfile 和 requirement.txt 来 build 镜像，最好是根据需求安装好所有依赖包再上传到自己的 hub
+    # 这里就直接使用最新版本的 anaconda3
+    image: continuumio/anaconda3:latest
+    links:
+      # 链接中指定好，python 脚本中 host 对应填 mysql-server 即可连接数据库
+      - mysql-server
+    # 指定工作路径，用 exec -it 进入容器时默认为此路径，方便运行脚本
+    working_dir: /py_project
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      - /root/server_docker/py_script:/py_project
+    ports:
+      - "8888:8888"
+    # 将终端置为 true，否则容器启动后会直接 exit
+    tty: true
+    container_name: anaconda3
